@@ -1,6 +1,29 @@
 # jfe
 Jump to Full Encryption
 
+# TL;DR
+
+Run one command, everything on your system supports TLS.
+
+# What I'm Up To
+Possible isn't enough.  If you want it done, make it easy.  I'm trying to make TLS deployment easy.
+
+Every project should be judged by the number of meetings required to get it accomplished.  For a long
+time it's required a lot of high-touch interactions to add cryptographic services to Internet systems.
+Let's Encrypt / CertBot has finally made machine acquirable certificates freely available (money
+requires meetings) and so there's been a steady trend towards services acquiring and maintaining
+their own certificates.
+
+Which is great, except everyone does it differently, if at all.  Lot of legacy out there, lot of
+protocols not running on HTTP.  There's more to TLS than HTTPS.
+
+Couldn't all this just work?
+
+JFE is an attempt to move us towards system-wide ambient cryptography.  It monitors incoming sessions
+for bytes declaring an expectation of cryptography, and silently fulfills that request, systemwide.
+
+It's early code, and I expect it to be rewritten many times.  OK!
+
 # Quick Demo
     root@MacCyber:~/jfe# ./jfe --staging -h
     Usage:
