@@ -1,7 +1,27 @@
 # jfe
-Jump Fast Encrypt
+Jump to Full Encryption
 
 # Quick Demo
+    root@MacCyber:~/jfe# ./jfe --staging -h
+    Usage:
+    JFE (Jump to Full Encryption):  Full System Encryption Agent
+    Dan Kaminsky, Chief Scientist, whiteops.com
+    
+    NOTE:  This is just a demonstration of a system-wide "bump in the wire"
+    TLS implementation providing encryption on demand when requested by a
+    client, using the new machine acquirable certicates freely available
+    from Certbot/Let's Encrypt/CertBot.
+    
+    Options:
+      -h, --help            show this help message and exit
+      --clear               Clear cached certs/creds
+      -s, --staging         Use Staging Server (Not As Rate Limited)
+      -w WEBROOT, --webroot=WEBROOT
+                            Location of webroot (/var/www/html)
+      -c ACCOUNTCACHE, --cache=ACCOUNTCACHE
+                            Location of cached credentials (/var/jfe)
+      -v, --verbose         Verbose (false)
+  
     root@Server:~/jfe# ./jfe.py --staging
     ...
     
