@@ -62,6 +62,14 @@ It's early code, and I expect it to be rewritten many times.  OK!
     <html>
     ...    
 
+# INSTALL
+This needs to be cleaned up, but basically:
+
+    mkdir /var/jfe
+    pip install -r requirements.txt
+
+...should cover most stuff.  By the time you read this, this paragraph shouldn't exist.
+
 # HOWTO
 It's actually mildly tricky to make all these pieces work together,
 and I haven't entirely figured out how to get everything I want.
