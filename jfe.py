@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import socket
 import threading
 import binascii
@@ -16,7 +18,6 @@ import glob
 import atexit
 from SimpleHTTPServer import SimpleHTTPRequestHandler
 from BaseHTTPServer import HTTPServer
-
 
 def flush_mangle_table():
     os.system("iptables -F -t mangle")
@@ -230,7 +231,7 @@ client, using the new machine acquirable certicates freely available
 from Certbot/Let's Encrypt/CertBot."""
 
     parser = optparse.OptionParser(usage=usage)
-    parser.add_option("-D", "--daemon", dest="daemonize", default=False, action="store_true", help="Run as Background Daemon")
+#    parser.add_option("-D", "--daemon", dest="daemonize", default=False, action="store_true", help="Run as Background Daemon")
     parser.add_option("", "--clear", dest="clearcache", default=False, action="store_true", help="Clear cached certs/creds")
     parser.add_option("-s", "--staging", dest="staging", default=False, action="store_true", help="Use Staging Server (Not As Rate Limited)")
     parser.add_option("-w", "--webroot", dest="webroot", default="/var/www/html", help="Location of webroot (/var/www/html)")
@@ -246,7 +247,7 @@ from Certbot/Let's Encrypt/CertBot."""
             os.remove(f)
 
 
-    server = HTTPServer(("127.0.0.1", 2000), RequestHandler)
+    server = HTTPServer(("127.0.0.1", 2), RequestHandler)
     thread = threading.Thread(target = server.serve_forever)
     thread.daemon = True
     thread.start()
@@ -254,4 +255,5 @@ from Certbot/Let's Encrypt/CertBot."""
         print "ummm"
         ThreadedServer('',1).listen()
     except:
+        flush_mangle_table()
         os._exit(1)
