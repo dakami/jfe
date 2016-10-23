@@ -47,7 +47,7 @@ class ThreadedServer(object):
         self.sock.bind((self.host, self.port))
 
     def listen(self):
-        self.sock.listen(5)
+        self.sock.listen(100)
         while True:
             try: 
                 client, address = self.sock.accept()
@@ -262,24 +262,27 @@ from Certbot/Let's Encrypt/CertBot."""
 
     parser = optparse.OptionParser(usage=usage)
 #    parser.add_option("-D", "--daemon", dest="daemonize", default=False, action="store_true", help="Run as Background Daemon")
-    parser.add_option("", "--clear", dest="clearcache", default=False, action="store_true", help="Clear cached certs/creds")
+#    parser.add_option("", "--clear", dest="clearcache", default=False, action="store_true", help="Clear cached certs/creds")
     parser.add_option("-s", "--staging", dest="staging", default=False, action="store_true", help="Use Staging Server (Not As Rate Limited)")
-    parser.add_option("-w", "--webroot", dest="webroot", default="/var/www/html", help="Location of webroot (/var/www/html)")
+#    parser.add_option("-w", "--webroot", dest="webroot", default="/var/www/html", help="Location of webroot (/var/www/html)")
     parser.add_option("-c", "--cache", dest="accountcache", default="./cache", help="Location of cached credentials (./cache)")
     parser.add_option("-v", "--verbose", dest="verbose", default=False, action="store_true", help="Verbose (false)")
     
 
     opts, remainder = parser.parse_args(sys.argv)
     print opts, remainder
+    if not os.path.isdir(opts.accountcache): os.mkdir(opts.accountcache)
+    if opts.staging:
+        opts.accountcache += "/staging/"
+    if not os.path.isdir(opts.accountcache): os.mkdir(opts.accountcache)
+    
     apply_firewall()
-    if(opts.clearcache):
-        for f in glob.glob(opts.accountcache + "/*"):
-            os.remove(f)
 
 
             
     server = SocketServer.ThreadingTCPServer(('0.0.0.0', 2), RequestHandler, False) # Do not automatically bind
     server.allow_reuse_address = True # Prevent 'cannot bind to address' errors on restart
+    server.allow_reuse_port = True # Prevent 'cannot bind to address' errors on restart
     server.server_bind()     # Manually bind, to support allow_reuse_address
     server.server_activate() # (see above comment)
     thread = threading.Thread(target = server.serve_forever)
