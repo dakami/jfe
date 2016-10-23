@@ -19,6 +19,8 @@ import atexit
 from SimpleHTTPServer import SimpleHTTPRequestHandler
 from BaseHTTPServer import HTTPServer
 import SocketServer
+import select
+import struct
 
 def flush_mangle_table():
     os.system("iptables -F -t mangle")
@@ -28,6 +30,11 @@ atexit.register(flush_mangle_table)
 def logger(msg):
     if opts.verbose: 
         print(msg)
+
+def getTCPInfo(s):
+        fmt = "B"*7+"I"*21
+        x = struct.unpack(fmt, s.getsockopt(socket.IPPROTO_TCP, socket.TCP_INFO, 92))
+        return x
 
 challenges = {}
 class ThreadedServer(object):
@@ -106,7 +113,7 @@ class ThreadedServer(object):
         try: forward.connect(("127.0.0.1", port))
         except:
             if(opts.verbose):
-                print "Connection to port " + str(port) + "rejected"
+                print "Connection to port " + str(port) + " rejected"
             return
 
         # this is clearly suboptimal, but I'm trying to get around the fact that
@@ -121,7 +128,7 @@ class ThreadedServer(object):
         forward.settimeout(999)
         threading.Thread(target = self.toForward, args = (client, address, forward)).start()
         threading.Thread(target = self.toClient,  args = (client, address, forward)).start()
-        
+
     def getCert(self, serverName, certFile):
         tos_url = None
         if os.path.isfile(opts.accountcache + "/tos_url.txt"):
@@ -157,25 +164,30 @@ class ThreadedServer(object):
         except:
             raise
         return self.getCert(serverName, certFile)
-        
-    def nuke(self, client, forward):
-        try: 
-            client.shutdown()
-        except:
-            pass
+
+
+    def _socket_nuke(self, sock):
+        try: sock=sock.unwrap()
+        except: pass
+        #try:
+        #    sock.close()
+        #except: pass
         try:
-            forward.shutdown()
-        except:
-            pass
+            sock.shutdown(socket.SHUT_RDWR)
+        except: pass
+
+    def nuke(self, client, forward):
+        self._socket_nuke(client)
+        self._socket_nuke(forward)
 
     def toForward(self, client, address, forward):
         while 1:
             try: 
                 data = client.recv(1024)
+                if len(data)==0: raise Exception
                 forward.send(data)
             except Exception as e:
-                print e
-                time.sleep(0.01)
+                time.sleep(0.3) # XXX need to detect proxy still draining
                 self.nuke(client, forward)
                 return
 
@@ -183,10 +195,10 @@ class ThreadedServer(object):
         while 1:
             try: 
                 data = forward.recv(1024)
+                if len(data)==0: raise Exception
                 client.send(data)
             except Exception as e:
-                print e
-                time.sleep(0.01)
+                time.sleep(0.3)  # XXX need to detect proxy still draining
                 self.nuke(client, forward)
                 return
 
@@ -274,7 +286,6 @@ from Certbot/Let's Encrypt/CertBot."""
     thread.daemon = True
     thread.start()
     try: 
-        print "ummm"
         ThreadedServer('',1).listen()
     except:
         flush_mangle_table()
