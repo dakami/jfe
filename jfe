@@ -18,6 +18,7 @@ import glob
 import atexit
 from SimpleHTTPServer import SimpleHTTPRequestHandler
 from BaseHTTPServer import HTTPServer
+import SocketServer
 
 def flush_mangle_table():
     os.system("iptables -F -t mangle")
@@ -55,7 +56,7 @@ class ThreadedServer(object):
 
         sniff = client.recv(128, socket.MSG_PEEK).split("\n")[0]
         if sniff.find(".well-known/acme-challenge")>-1:
-            port = 80
+            port = 2
         if(port == 443): 
             port = 80
         sniff = binascii.hexlify(sniff)
@@ -108,6 +109,12 @@ class ThreadedServer(object):
                 print "Connection to port " + str(port) + "rejected"
             return
 
+        # this is clearly suboptimal, but I'm trying to get around the fact that
+        # there's other things that can block (free_tls_certificates and my
+        # waiting for it) and I don't want one connection to be able to block
+        # everything else.  It'd be nice to use *anything* else but there's
+        # missing features in every other approach, see readme
+        
         client.setblocking(1)
         client.settimeout(999)
         forward.setblocking(1)
@@ -138,13 +145,15 @@ class ThreadedServer(object):
         except certbotClient.NeedToTakeAction as e:
             for action in e.actions:
                 if isinstance(action, certbotClient.NeedToInstallFile):
-                    f = open(opts.webroot + "/.well-known/acme-challenge/" + action.url.split("/")[-1], "w") # XXX exploitable
-                    f.write(action.contents)
-                    challenges[action.url.split("/")[-1]] = action.contents
-                    f.close()
+                    #f = open(opts.webroot + "/.well-known/acme-challenge/" + action.url.split("/")[-1], "w") # XXX exploitable
+                    #f.write(action.contents)
+                    challenge = action.url.split("/")[-1]
+                    challenges[challenge] = action.contents # XXX obviously need a cache that times out
+                    #f.close()
         except certbotClient.WaitABit as e:
             import datetime
-            print ("Try again in %s." % (e.until_when - datetime.datetime.now()))                
+            print ("Try again in %s." % (e.until_when - datetime.datetime.now()))   
+            # XXX need to actually implement a blocker
         except:
             raise
         return self.getCert(serverName, certFile)
@@ -158,7 +167,7 @@ class ThreadedServer(object):
             forward.shutdown()
         except:
             pass
-        
+
     def toForward(self, client, address, forward):
         while 1:
             try: 
@@ -192,6 +201,7 @@ iptables -t mangle -A DIVERT -j MARK --set-mark 1
 iptables -t mangle -A DIVERT -j ACCEPT
 ip rule add fwmark 1 lookup 100
 ip route add local 0.0.0.0/0 dev lo table 100
+# Refusing to intercept SSH until this is 100% solid
 iptables -t mangle -A PREROUTING  -p tcp --dport 23:65535 ! -d 127.0.0.1 -j TPROXY \
  --tproxy-mark 0x1/0x1 --on-port 1
 iptables -L -t mangle
@@ -200,22 +210,30 @@ iptables -L -t mangle
    
 opts = None
 remainder = None
-
+    
+        
 class RequestHandler(SimpleHTTPRequestHandler):
+    def do_HEAD(self):
+        # XXX look for people who screwed this up, nice landmine if spidey sense is right
+        self.send_response(404)
+        self.send_header('Content-Length',0)
+        self.end_headers()
+        
     def do_GET(self):
-        self.protocol_version = 'HTTP/1.0'
+        self.protocol_version = 'HTTP/1.1'
         if(self.path[-1]=="/"): 
             self.path="/noindex"
-        if True: #os.path.isfile(file):
-            print "y"
+        challenge = self.path.split("/")[-1]
+        if challenge in challenges:
             self.send_response(200)
-            data = "123"
-            #data = open(opts.webroot + self.path, "rb").read()
+            data = challenges[challenge]
+            self.send_header('Content-Length',len(data))
             self.end_headers()
             self.wfile.write(data)
+            print self.path, data
         else:
-            print "n"
             self.send_response(404)
+            self.send_header('Content-Length',0)
             self.end_headers()
 
 
@@ -235,7 +253,7 @@ from Certbot/Let's Encrypt/CertBot."""
     parser.add_option("", "--clear", dest="clearcache", default=False, action="store_true", help="Clear cached certs/creds")
     parser.add_option("-s", "--staging", dest="staging", default=False, action="store_true", help="Use Staging Server (Not As Rate Limited)")
     parser.add_option("-w", "--webroot", dest="webroot", default="/var/www/html", help="Location of webroot (/var/www/html)")
-    parser.add_option("-c", "--cache", dest="accountcache", default="/var/jfe", help="Location of cached credentials (/var/jfe)")
+    parser.add_option("-c", "--cache", dest="accountcache", default="./cache", help="Location of cached credentials (./cache)")
     parser.add_option("-v", "--verbose", dest="verbose", default=False, action="store_true", help="Verbose (false)")
     
 
@@ -247,7 +265,11 @@ from Certbot/Let's Encrypt/CertBot."""
             os.remove(f)
 
 
-    server = HTTPServer(("127.0.0.1", 2), RequestHandler)
+            
+    server = SocketServer.ThreadingTCPServer(('0.0.0.0', 2), RequestHandler, False) # Do not automatically bind
+    server.allow_reuse_address = True # Prevent 'cannot bind to address' errors on restart
+    server.server_bind()     # Manually bind, to support allow_reuse_address
+    server.server_activate() # (see above comment)
     thread = threading.Thread(target = server.serve_forever)
     thread.daemon = True
     thread.start()
