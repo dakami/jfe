@@ -97,6 +97,8 @@ It's on every instance.
 8) I'm sure Caddy or HAProxy or other approaches could integrate this
 semi-opportunistic crypto mode.
 
+9) STARTTLS is actually really easy (famous last words).
+
 # WARNING
 
 A server that opportunistically enables cryptography can be secure,
