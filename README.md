@@ -40,7 +40,9 @@ It's early code, and I expect it to be rewritten many times.  OK!
       -s, --staging         Use Staging Server (Not As Rate Limited)
       -c ACCOUNTCACHE, --cache=ACCOUNTCACHE
                             Location of cached credentials (./cache)
-      -v, --verbose         Verbose (false)    root@Server:~/jfe# ./jfe.py --staging
+      -v, --verbose         Verbose (false)
+    
+    # ./jfe.py --staging
     ...
     
     user@Client:~# curl -k http://163.jfe.example
