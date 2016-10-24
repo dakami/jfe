@@ -21,6 +21,8 @@ Couldn't all this just work?
 
 JFE is an attempt to move us towards system-wide ambient cryptography.  It monitors incoming sessions
 for bytes declaring an expectation of cryptography, and silently fulfills that request, systemwide.
+This is different than some other approaches (Caddy, HAProxy) which (for now!)
+assume a peer is requesting cryptography.
 
 It's early code, and I expect it to be rewritten many times.  OK!
 
@@ -89,6 +91,21 @@ It's on every instance.
 6) SSH integration.  Not everyone likes TOFU.
 
 7) Build the better DNS validation backend.
+
+8) I'm sure Caddy or HAProxy or other approaches could integrate this
+semi-opportunistic crypto mode.
+
+# WARNING
+
+A server that opportunistically enables cryptography can be secure,
+since a client will reject a connection that "mysteriously" doesn't
+support security.
+
+The opposite, where a client adds crypto if a server appears to support
+it, is much trickier.  A MITM can remove the crypto support and the client
+might just shrug its shoulders and go unencrypted.
+
+This problem can be dealt with, but I'm not working on it right now.
 
 # HOWTO
 It's actually mildly tricky to make all these pieces work together,
