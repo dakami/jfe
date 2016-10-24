@@ -25,8 +25,8 @@ for bytes declaring an expectation of cryptography, and silently fulfills that r
 It's early code, and I expect it to be rewritten many times.  OK!
 
 # Quick Demo
-    root@MacCyber:~/jfe# ./jfe --staging -h
-    Usage:
+    # ./jfe  -h
+    Usage: 
     JFE (Jump to Full Encryption):  Full System Encryption Agent
     Dan Kaminsky, Chief Scientist, whiteops.com
     
@@ -37,15 +37,10 @@ It's early code, and I expect it to be rewritten many times.  OK!
     
     Options:
       -h, --help            show this help message and exit
-      --clear               Clear cached certs/creds
       -s, --staging         Use Staging Server (Not As Rate Limited)
-      -w WEBROOT, --webroot=WEBROOT
-                            Location of webroot (/var/www/html)
       -c ACCOUNTCACHE, --cache=ACCOUNTCACHE
-                            Location of cached credentials (/var/jfe)
-      -v, --verbose         Verbose (false)
-  
-    root@Server:~/jfe# ./jfe.py --staging
+                            Location of cached credentials (./cache)
+      -v, --verbose         Verbose (false)    root@Server:~/jfe# ./jfe.py --staging
     ...
     
     user@Client:~# curl -k http://163.jfe.example
