@@ -68,7 +68,30 @@ This needs to be cleaned up, but basically:
     mkdir /var/jfe
     pip install -r requirements.txt
 
-...should cover most stuff.  By the time you read this, this paragraph shouldn't exist.
+# TODO
+
+1) The particular methodology here yields servers that think they're talking
+to 127.0.0.1, and worse, expose their services that are bound exclusively
+to localhost.  Probably the most important bug to smash.
+
+2) Performance ain't great, and the finer points of handling proxied sockets
+and socket flushing are really tricky to get right.  I wouldn't mind a
+much more performant solution nor kernel modules to get there.
+
+3) Docker's exposed sockets would likely be a pretty good place
+to integrate this trickery.
+
+4) The clouds tend to have pretty good services around TCP proxying
+and TLS wrapping, up to and including certificate integration backed
+by their DNS engines.  This could all get wrapped up with a nice bow.
+
+5) Could be interesting to take the Amazon cert exposed on 169.254.169.254
+and hook it up to Let's Encrypt.  Oh, you didn't know there was one?
+It's on every instance.
+
+6) SSH integration.  Not everyone likes TOFU.
+
+7) Build the better DNS validation backend.
 
 # HOWTO
 It's actually mildly tricky to make all these pieces work together,
