@@ -6,7 +6,8 @@ Jump to Full Encryption
 Run one command, everything on your system supports TLS.
 
 # What I'm Up To
-Possible isn't enough.  If you want it done, make it easy.  I'm trying to make TLS deployment easy.
+Possible isn't enough.  If you want it done, make it easy.  I'm trying to make TLS deployment easy,
+no matter what you're running.
 
 Every project should be judged by the number of meetings required to get it accomplished.  For a long
 time it's required a lot of high-touch interactions to add cryptographic services to Internet systems.
@@ -15,7 +16,8 @@ requires meetings) and so there's been a steady trend towards services acquiring
 their own certificates.
 
 Which is great, except everyone does it differently, if at all.  Lot of legacy out there, lot of
-protocols not running on HTTP.  There's more to TLS than HTTPS.
+protocols not running on HTTP.  There's more to TLS than HTTPS.  Databases,
+I'm looking at you.
 
 Couldn't all this just work?
 
