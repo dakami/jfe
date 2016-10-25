@@ -2,6 +2,8 @@
 Jump to Full Encryption
 
 # TL;DR
+Full TLS 
+
 
 Run one command, everything on your system supports TLS.
 
@@ -63,6 +65,31 @@ It's early code, and I expect it to be rewritten many times.  OK!
     <html>
     ...    
 
+# DESIGN NOTES
+
+Here's how JFE is set up to work, at present.  Lots of assumptions, most of which
+will be polished out:
+
+1. Ask Linux's firewall to send our TCP port (1/tcp) all traffic matching 23/tcp
+   to 65535/tcp not sourced from localhost.
+2. Set the IP Socket Option "IP_TRANSPARENT" (Ordinal 19) on that socket, so the
+   packets sent via the above's TPROXY rule can be accept()'ed.
+3. Read the first few bytes from the TCP socket using the MSG_PEEK flag, which
+   does not actually drain the socket.  See if the client wants TLS, by looking
+   (very lightly, right now) for a TLS Client Hello
+4. If so, wrap TLS using Python SSL socket wrapping, and a self signed cert
+5. On incoming connection, inspect the server name using SNI.  Make sure it's
+   a valid name, that resolves to our visible IP.  If so, if we've got a cert
+   for the name, use that, otherwise, ask CertBot for one.
+6. We're hijacking traffic on from 23 to 65535, and that includes 80/tcp which
+   CertBot will be coming to.  We see the inbound .well-known/acme-challenge
+   request and send it to our own web server, which has been configured to
+   respond to the CertBot challenge.
+7. We end up with a valid certificate at a known place, load it up, and replace
+   the earlier self signed context with this new one generated on demand.
+8. It's somewhat straightforward TCP proxying at this point, managed via threads
+   because free_tls_certificates makes blocking a thing that can happen at this time.
+
 # INSTALL
 This needs to be cleaned up, but basically:
 
@@ -99,6 +126,14 @@ semi-opportunistic crypto mode.
 
 9) STARTTLS is actually really easy (famous last words).
 
+10) The canonical issue with these constructions is the server doesn't know
+what names it necessarily needs to support, and learning names from the
+environment means learning names from attackers.  They can always give us
+correct names and our own IP, and just try to get us to register too many
+domain/IP mappings.  Not a big deal in, say, a DNSSEC world -- but significant
+in a CertBot/Let's Encrypt one.  I'm still deciding the right way to handle
+this straightforward annoyance, even at this early stage.
+
 # WARNING
 
 A server that opportunistically enables cryptography can be secure,
@@ -110,6 +145,8 @@ it, is much trickier.  A MITM can remove the crypto support and the client
 might just shrug its shoulders and go unencrypted.
 
 This problem can be dealt with, but I'm not working on it right now.
+
+I do note that a client could be forced pretty easily into Always Encrypting.
 
 # HOWTO
 It's actually mildly tricky to make all these pieces work together,
