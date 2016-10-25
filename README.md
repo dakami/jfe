@@ -2,8 +2,6 @@
 Jump to Full Encryption
 
 # TL;DR
-Full TLS 
-
 
 Run one command, everything on your system supports TLS.
 
