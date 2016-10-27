@@ -22,6 +22,7 @@ from IPy import IP
 import SocketServer
 import select
 import struct
+from daemonize import Daemonize
 
 def flush_mangle_table():
     os.system("iptables -F -t mangle")
@@ -32,13 +33,39 @@ def logger(*msg):
     if opts.verbose: 
         print(msg)
 
+# XXX unused for now
 def getTCPInfo(s):
         fmt = "B"*7+"I"*21
         x = struct.unpack(fmt, s.getsockopt(socket.IPPROTO_TCP, socket.TCP_INFO, 92))
         return x
 
 challenges = {}
-class ThreadedServer(object):
+
+class RequestHandler(SimpleHTTPRequestHandler):
+    def do_HEAD(self):
+        # XXX look for people who screwed this up, nice landmine if spidey sense is right
+        self.send_response(404)
+        self.send_header('Content-Length',0)
+        self.end_headers()
+        
+    def do_GET(self):
+        self.protocol_version = 'HTTP/1.1'
+        if(self.path[-1]=="/"): 
+            self.path="/noindex"
+        challenge = self.path.split("/")[-1]
+        if challenge in challenges:
+            self.send_response(200)
+            data = challenges[challenge]
+            self.send_header('Content-Length',len(data))
+            self.end_headers()
+            self.wfile.write(data)
+            print self.path, data
+        else:
+            self.send_response(404)
+            self.send_header('Content-Length',0)
+            self.end_headers()
+
+class JFEServer(object):
     def __init__(self, host, port):
         self.host = host
         self.port = port
@@ -46,8 +73,21 @@ class ThreadedServer(object):
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.setsockopt(socket.SOL_IP, 19, 1) #ORDINALS!  Actually IP_TRANSPARENT
         self.sock.bind((self.host, self.port))
+        
+        
 
     def listen(self):
+        # needs to be part of the JFE server, or it doesn't survive daemonization
+        server = SocketServer.ThreadingTCPServer(('0.0.0.0', 2), RequestHandler, False) # Do not automatically bind
+        server.allow_reuse_address = True # Prevent 'cannot bind to address' errors on restart
+        server.allow_reuse_port = True # Prevent 'cannot bind to address' errors on restart
+        server.server_bind()     # Manually bind, to support allow_reuse_address
+        server.server_activate() # (see above comment)
+        thread = threading.Thread(target = server.serve_forever)
+        #thread.daemon = True
+        thread.start()
+
+
         self.sock.listen(100)
         while True:
             try: 
@@ -246,30 +286,6 @@ opts = None
 remainder = None
     
         
-class RequestHandler(SimpleHTTPRequestHandler):
-    def do_HEAD(self):
-        # XXX look for people who screwed this up, nice landmine if spidey sense is right
-        self.send_response(404)
-        self.send_header('Content-Length',0)
-        self.end_headers()
-        
-    def do_GET(self):
-        self.protocol_version = 'HTTP/1.1'
-        if(self.path[-1]=="/"): 
-            self.path="/noindex"
-        challenge = self.path.split("/")[-1]
-        if challenge in challenges:
-            self.send_response(200)
-            data = challenges[challenge]
-            self.send_header('Content-Length',len(data))
-            self.end_headers()
-            self.wfile.write(data)
-            print self.path, data
-        else:
-            self.send_response(404)
-            self.send_header('Content-Length',0)
-            self.end_headers()
-
 
 
 if __name__ == "__main__":
@@ -282,12 +298,14 @@ TLS implementation providing encryption on demand when requested by a
 client, using the new machine acquirable certicates freely available
 from Certbot/Let's Encrypt/CertBot."""
 
+    pidfile = "/dev/null"
     parser = optparse.OptionParser(usage=usage)
-#    parser.add_option("-D", "--daemon", dest="daemonize", default=False, action="store_true", help="Run as Background Daemon")
+    parser.add_option("-D", "--daemon", dest="daemonize", default=False, action="store_true", help="Run as Background Daemon")
+    parser.add_option("-p", "--pidfile", dest="pidfile", default="/dev/null", help="PID of process (when daemonized)")
 #    parser.add_option("", "--clear", dest="clearcache", default=False, action="store_true", help="Clear cached certs/creds")
     parser.add_option("-s", "--staging", dest="staging", default=False, action="store_true", help="Use Staging Server (Not As Rate Limited)")
 #    parser.add_option("-w", "--webroot", dest="webroot", default="/var/www/html", help="Location of webroot (/var/www/html)")
-    parser.add_option("-c", "--cache", dest="accountcache", default="./cache", help="Location of cached credentials (./cache)")
+    parser.add_option("-c", "--cache", dest="accountcache", default=os.getcwd() + "/cache", help="Location of cached credentials (./cache)")
     parser.add_option("-v", "--verbose", dest="verbose", default=False, action="store_true", help="Verbose (false)")
     
 
@@ -302,16 +320,14 @@ from Certbot/Let's Encrypt/CertBot."""
 
 
             
-    server = SocketServer.ThreadingTCPServer(('0.0.0.0', 2), RequestHandler, False) # Do not automatically bind
-    server.allow_reuse_address = True # Prevent 'cannot bind to address' errors on restart
-    server.allow_reuse_port = True # Prevent 'cannot bind to address' errors on restart
-    server.server_bind()     # Manually bind, to support allow_reuse_address
-    server.server_activate() # (see above comment)
-    thread = threading.Thread(target = server.serve_forever)
-    thread.daemon = True
-    thread.start()
-    try: 
-        ThreadedServer('',1).listen()
-    except:
-        flush_mangle_table()
-        os._exit(1)
+    jfe_server = JFEServer('',1)
+    if opts.daemonize:
+        daemon = Daemonize(app="jfe", pid=opts.pidfile, auto_close_fds = False, action=jfe_server.listen, foreground = False)
+        daemon.start()
+        time.sleep(1)
+    else:
+        try: 
+            jfe_server.listen()
+        except:
+            flush_mangle_table()
+            os._exit(1)
