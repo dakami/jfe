@@ -24,7 +24,11 @@ import struct
 from daemonize import Daemonize
 
 def flush_mangle_table():
-    os.system("iptables -F -t mangle")
+    os.system("""
+iptables -F -t mangle
+ip rule del fwmark 1 lookup 100
+ip route del local 0.0.0.0/0 dev lo table 100
+""")
 
 atexit.register(flush_mangle_table)
 
