@@ -18,6 +18,7 @@ import glob
 import atexit
 from SimpleHTTPServer import SimpleHTTPRequestHandler
 from BaseHTTPServer import HTTPServer
+from IPy import IP
 import SocketServer
 import select
 import struct
@@ -32,7 +33,7 @@ ip route del local 0.0.0.0/0 dev lo table 100
 
 atexit.register(flush_mangle_table)
 
-def logger(msg):
+def logger(*msg):
     if opts.verbose: 
         print(msg)
 
@@ -107,14 +108,17 @@ class JFEServer(object):
 
         sniff = client.recv(128, socket.MSG_PEEK).split("\n")[0]
         if sniff.find(".well-known/acme-challenge")>-1:
+            logger( "found acme challenge")
             port = 2
         if(port == 443): 
             port = 80
         sniff = binascii.hexlify(sniff)
 
         if(sniff[0:4]=="1603"): #XXX need better SSL sniff
+            logger("sniffed SSL client hello")
             ctx=ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
             if not os.path.isfile(opts.accountcache + "/selfstub.cer"):
+                logger("no cached selfstub.cer, issuing self signed cert")
                 cert=certbotClient.issue_certificate(
                     ["localhost"],
                     opts.accountcache,
@@ -125,17 +129,36 @@ class JFEServer(object):
 
             ctx.load_cert_chain(certfile=opts.accountcache + "/selfstub.cer")
             def on_sni(sslSocket,serverName,ctx):
+                logger("on_sni: ", serverName)
                 if not serverName: 
                     return None
-                if not re.match("^((?!-)[A-Za-z0-9-]{1,63}(?<!-)\.)+[A-Za-z]{2,6}$", serverName): return None #could error
+                if not re.match("^((?!-)[A-Za-z0-9-]{1,63}(?<!-)\.)+[A-Za-z]{2,6}$", serverName):
+                    logger("regex match of servername failed")
+                    return None #could error
                 try:
                     remote = get('https://api.ipify.org').text  #NOT XXX -- This is apparently a stable IP discovery endpoint
-                    dns    = socket.gethostbyname(serverName)   #    XXX -- This needs to check all A records, at least
-                    if opts.verbose: 
-                        print remote, dns
-                    if remote != dns:
+                    addrinfo = socket.getaddrinfo(serverName, port, 0, 0, 6)  #  XXX -- This needs to check all A records, at least
+                    matchedAddr = None
+                    firstAddr = None
+                    for addr in addrinfo:
+                      sockaddr = addr[4]
+                      address = sockaddr[0]
+                      if firstAddr is None:
+                        firstAddr = address
+                      if remote == address:
+                        matchedAddr = address
+                    logger(remote, matchedAddr)
+                    if matchedAddr is None:
+                        print "getaddrinfo for", serverName, "[", firstAddr, "] did not match remote ip", remote
+                        ip = IP(firstAddr)
+                        if not ip.iptype() == "PUBLIC":
+                          print "The IP address returned by getaddrinfo was of type ", ip.iptype()
+                          print "Perhaps this is a default hostname in a cloud environment like AWS or you are behind a NAT?"
+                          print "To prevent denial of service attacks, certificates will only be requested for names"
+                          print "which are locally recognized as bound to a public IP address of this machine."
                         return None
-                except:
+                except Exception as e:
+                    print e.message
                     return None
                 certFile = opts.accountcache + "/" + serverName + ".cer"
                 if not os.path.isfile(certFile): # XXX need to check for expiry
@@ -156,8 +179,7 @@ class JFEServer(object):
         # XXX How to make the connection appear to come from its original source?
         try: forward.connect(("127.0.0.1", port))
         except:
-            if(opts.verbose):
-                print "Connection to port " + str(port) + " rejected"
+            logger("Connection to port " + str(port) + " rejected")
             return
 
         # this is clearly suboptimal, but I'm trying to get around the fact that
